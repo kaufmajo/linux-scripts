@@ -14,7 +14,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-VERSION="0.7.3"
+VERSION="0.7.4"
 
 #===============================================================
 # OUTPUT HELPERS
@@ -41,21 +41,19 @@ die() {
 repeat_char() { printf "%${2}s" '' | tr ' ' "$1"; }
 
 main_header() {
-    local title="[ $1 ]" subtitle="< $2 >" width=64
+    local title="$1" subtitle="< $2 >" color="${3:-$C_GRAY}" width=64
     local inner=$((width - 2))
     center() { printf '|%*s%*s|\n' $(((inner + ${#1}) / 2)) "$1" $((inner - (inner + ${#1}) / 2)) ''; }
-    printf '\n%s' "$C_CYAN"
-    repeat_char '=' "$width"; echo
+    printf '\n%s' "$C_GRAY"; repeat_char '=' "$width"; printf '%s\n' "$color"
     printf '|%*s|\n' "$inner" ''
     center "$title"
     center "$subtitle"
     printf '|%*s|\n' "$inner" ''
-    repeat_char '=' "$width"
-    printf '%s\n\n' "$C_RESET"
+    printf '%s' "$C_GRAY"; repeat_char '=' "$width"; printf '%s\n\n' "$C_RESET"
 }
 
 section_header() {
-    local title="[ $1 ]" color="${2:-$C_CYAN}"
+    local title="$1" color="${2:-$C_GRAY}"
     printf '\n%s' "$C_GRAY"; repeat_char '=' 64; printf '%s\n' "$C_RESET"
     printf '%s%s%s\n' "$color" "$title" "$C_RESET"
     printf '%s' "$C_GRAY"; repeat_char '=' 64; printf '%s\n\n' "$C_RESET"
@@ -132,10 +130,10 @@ main_header "Backup Script (WSL)" "Version $VERSION"
 #===============================================================
 
 # The WSL kernel has "microsoft" in its version string.
-grep -qi microsoft /proc/version 2>/dev/null || die "This script only runs in WSL."
+grep -qi microsoft /proc/version 2>/dev/null || die "This script only runs in WSL"
 
 # Running as root would make $USER "root" and change the target folder.
-[[ $EUID -ne 0 ]] || die "Please run as your normal user."
+[[ $EUID -ne 0 ]] || die "Please run as your normal user"
 
 for tool in rsync powershell.exe pwsh.exe wsl.exe wslpath; do
     command -v "$tool" >/dev/null || die "Required tool not found: $tool"
@@ -159,7 +157,7 @@ WIN_BACKUP_SCRIPT=""
 SOURCES=()
 EXCLUDES=()
 
-info "${C_CYAN}Using config file: $CONFIG_FILE${C_RESET}"
+info "Using config file $CONFIG_FILE"
 
 # "source" runs the config file as bash code in this shell, so its variables
 # become ours. Only ever source files you trust!
@@ -183,7 +181,7 @@ for pattern in "${EXCLUDES[@]}"; do
     EXCLUDE_ARGS+=("--exclude=$pattern")
 done
 
-$DRY_RUN && warn "Dry run: nothing will be changed."
+$DRY_RUN && warn "Dry run: nothing will be changed"
 
 #===============================================================
 # HELPERS
@@ -224,7 +222,7 @@ run_rsync() {
     rsync "${extra[@]}" "$@" || rc=$?
     case $rc in
     0) ;;
-    24) warn "Some source files vanished during transfer (rsync code 24)." ;;
+    24) warn "Some source files vanished during transfer (rsync code 24)" ;;
     *)
         error "rsync failed with exit code $rc"
         FAILED=true
@@ -245,28 +243,31 @@ declare -A DRIVE_MOUNT=() # role -> mount point, filled by prepare_drive
 win_unlock_bitlocker() {
     local role="$1" letter="$2" envvar="$3"
 
-    [[ -n "$WIN_UNLOCK_SCRIPT" ]] || { warn "$role: WIN_UNLOCK_SCRIPT is not set."; return 1; }
-    [[ -f "$WIN_UNLOCK_SCRIPT" ]] || { warn "$role: unlock script not found: $WIN_UNLOCK_SCRIPT"; return 1; }
+    # "Master" / "Slave": for the messages and the PS script's
+    # -MasterDriveLetter / -SlaveDriveLetter parameters.
+    # ${role,,} = "master", ${x^} = first letter uppercase -> "Master"
+    local prefix="${role,,}"
+    prefix="${prefix^}"
+
+    [[ -n "$WIN_UNLOCK_SCRIPT" ]] ||
+        { warn "$prefix drive '$letter' cannot be unlocked, WIN_UNLOCK_SCRIPT is not set"; return 1; }
+    [[ -f "$WIN_UNLOCK_SCRIPT" ]] ||
+        { warn "$prefix drive '$letter' cannot be unlocked, unlock script '$WIN_UNLOCK_SCRIPT' not found"; return 1; }
 
     # wslpath converts paths: /mnt/c/foo -> C:\foo (-w) and back (-u).
     local script_win
     script_win="$(wslpath -w "$WIN_UNLOCK_SCRIPT")"
 
-    # The PS script has -MasterDriveLetter / -SlaveDriveLetter parameters.
-    # ${role,,} = "master", ${x^} = first letter uppercase -> "Master"
-    local prefix="${role,,}"
-    prefix="${prefix^}"
-
     info "${C_YELLOW}Drive $letter: is locked. Unlocking via Windows (confirm the UAC prompt) ...${C_RESET}"
     pwsh.exe -NoProfile -ExecutionPolicy Bypass -File "$script_win" \
         "-${prefix}DriveLetter" "$letter" "-${prefix}DriveEnvvar" "$envvar" ||
-        { warn "$role: unlock failed."; return 1; }
+        { warn "$prefix drive '$letter' could not be unlocked"; return 1; }
 }
 
 # Check, unlock and mount one Windows drive. Sets DRIVE_MOUNT[$role] on success.
 prepare_drive() {
     local role="$1"
-    local label letter bitlocker envvar
+    local label letter bitlocker envvar role_name="${role,,}" # MASTER -> master
     letter="$(cfg "$role" LETTER)"
     letter="${letter^^}" # uppercase
     label="$(cfg "$role" LABEL)"
@@ -274,11 +275,11 @@ prepare_drive() {
     envvar="$(cfg "$role" ENVVAR)"
 
     [[ -n "$label" && -n "$letter" ]] || return 1
-    [[ "$letter" =~ ^[A-Z]$ ]] || { warn "$role: invalid drive letter '$letter'."; return 1; }
+    [[ "$letter" =~ ^[A-Z]$ ]] || { warn "${role_name^} drive letter '$letter' is invalid"; return 1; }
 
     local volume fstype actual_label
     volume="$(win_volume_info "$letter")"
-    [[ -n "$volume" ]] || { warn "$role: drive $letter: not found."; return 1; }
+    [[ -n "$volume" ]] || { warn "${role_name^} drive '$letter' not found"; return 1; }
     IFS='|' read -r fstype actual_label <<<"$volume"
 
     # Label doesn't match and drive is BitLocker -> probably locked: unlock and look again.
@@ -289,7 +290,7 @@ prepare_drive() {
     fi
 
     if [[ "$actual_label" != "$label" ]]; then
-        warn "$role: drive $letter: has label '$actual_label' ($fstype), expected '$label'."
+        warn "${role_name^} drive '$letter' has label '$actual_label' ($fstype), expected '$label'"
         return 1
     fi
 
@@ -306,7 +307,7 @@ prepare_drive() {
         info "Mounting $letter: on $mnt ..."
         as_root mkdir -p "$mnt"
         as_root mount -t drvfs "$letter:" "$mnt" -o "uid=$(id -u),gid=$(id -g)" ||
-            { warn "$role: mount failed."; return 1; }
+            { warn "${role_name^} drive '$letter' could not be mounted"; return 1; }
     fi
 
     DRIVE_MOUNT[$role]="$mnt"
@@ -372,7 +373,7 @@ ask_for_drive() {
     label="$(cfg "$role" LABEL)"
     [[ -n "$label" ]] || return 1
 
-    printf 'Enter %s%s%s drive letter (label "%s", empty to skip): ' "$C_YELLOW" "${role,,}" "$C_RESET" "$label"
+    printf 'Enter %s%s%s drive letter: ' "$C_YELLOW" "${role,,}" "$C_RESET"
     wait_for_input answer
     [[ -n "$answer" ]] || return 1
 
@@ -407,10 +408,11 @@ for role in MASTER SLAVE; do
     if [[ -n "${DRIVE_MOUNT[$role]-}" ]]; then
         # Same layout as Backup.ps1: <drive>/<computer>/<target folder>/<user>
         target="${DRIVE_MOUNT[$role]}/$(hostname)/$TARGET_FOLDER/$USER"
-        info "${C_GREEN}${role,,}: $target/${C_RESET}"
+        role_name="${role,,}" # MASTER -> master, then ${role_name^} -> Master
+        info "${C_GREEN}${role_name^} is $target/${C_RESET}"
         TARGETS+=("$target")
     else
-        error "No valid ${role,,} drive given, or drive is locked."
+        info "${C_YELLOW}No valid ${role,,} drive given, or drive is locked${C_RESET}"
     fi
 done
 
@@ -426,7 +428,7 @@ STAMP="$(date +%Y-%m-%d_%H_%M_%S)"
 for target in "${TARGETS[@]}"; do
 
     history_root="$target.history"
-    section_header "Backup to $target/" "$C_MAGENTA"
+    section_header "Backup to $target/"
 
     $DRY_RUN || mkdir -p "$target"
 
@@ -436,21 +438,37 @@ for target in "${TARGETS[@]}"; do
     $SKIP_HISTORY || history_args=(--backup --backup-dir="$history_root/$STAMP")
 
     # --relative   keep the full source path below the target (/var/www -> <target>/var/www)
+    # --info=name1 lists only what rsync changes. tee also writes that list to
+    # a temp file: empty = nothing changed. "> >(tee ...)" keeps run_rsync in
+    # this shell, so its FAILED=true is not lost.
+    rsync_log="$(mktemp)"
     run_rsync "${RSYNC_OPTS[@]}" --relative --info=name1 "${history_args[@]}" \
-        "${EXCLUDE_ARGS[@]}" "${SOURCES[@]}" "$target/" || true
+        "${EXCLUDE_ARGS[@]}" "${SOURCES[@]}" "$target/" > >(tee "$rsync_log") || true
+    wait $! # let tee finish writing
+
+    [[ -s "$rsync_log" ]] || info "No changed files found for backup"
+    rm -f -- "$rsync_log"
 
     if $SKIP_HISTORY; then
         warn "History: skipped (--skip-history)"
         continue # next target - no history to report or clean up
     fi
 
-    # Report the history, like "Moved to history: N file(s)" in Backup.ps1.
-    # The folder only exists if rsync had to save an old version.
-    if [[ -d "$history_root/$STAMP" ]]; then
-        count="$(find "$history_root/$STAMP" -type f | wc -l)"
-        info "${C_CYAN}History: $count old version(s) saved to $history_root/$STAMP/${C_RESET}"
-    elif ! $DRY_RUN; then
-        info "${C_CYAN}History: nothing overwritten or deleted, no history folder needed.${C_RESET}"
+    # Report the history like Backup.ps1: one line per file, then the count.
+    # rsync saves the old versions during the mirror, so this section comes
+    # after the backup. The folder only exists if an old version was saved.
+    if ! $DRY_RUN; then
+        section_header "History to $history_root/$STAMP/"
+
+        count=0
+        if [[ -d "$history_root/$STAMP" ]]; then
+            while IFS= read -r -d '' file; do
+                info "History: $file"
+                count=$((count + 1))
+            done < <(find "$history_root/$STAMP" -type f -printf '%P\0' | sort -z)
+        fi
+
+        info "Moved $count file(s) to history"
     fi
 
     # Keep the newest $HISTORY_KEEP history folders. The names are timestamps,
@@ -478,8 +496,6 @@ done
 
 if $WITH_WINDOWS; then
 
-    section_header "Windows backup" "$C_YELLOW"
-
     [[ -f "$WIN_BACKUP_SCRIPT" ]] || die "Backup.ps1 not found: $WIN_BACKUP_SCRIPT"
 
     # "${WINDOWS_ARGS[@]}" = everything after "--", passed on unchanged.
@@ -497,11 +513,8 @@ fi
 # DONE
 #===============================================================
 
-echo
-
 if $FAILED; then
-    error "Backup finished with errors."
+    echo
+    error "Backup finished with errors"
     exit 1
 fi
-
-info "${C_GREEN}Backup finished.${C_RESET}"
