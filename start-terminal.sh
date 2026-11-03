@@ -16,7 +16,7 @@ PS1_FILE="${START_TERMINAL_PS1:-$SCRIPT_DIR/Start-Terminal.ps1}"
 if [ ! -f "$PS1_FILE" ]; then
     WIN_USERPROFILE="$(cmd.exe /c 'echo %USERPROFILE%' 2>/dev/null | tr -d '\r\n')"
     if [ -n "$WIN_USERPROFILE" ]; then
-        PS1_FILE="$(wslpath "$WIN_USERPROFILE")/Joachim/Devpool/Scripts/Start-Terminal.ps1"
+        PS1_FILE="$(wslpath "$WIN_USERPROFILE")/Joachim/Devpool/Repo/kfmj/win_scripts/Start-Terminal.ps1"
     fi
 fi
 
