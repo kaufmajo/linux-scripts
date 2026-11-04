@@ -409,7 +409,7 @@ for role in MASTER SLAVE; do
         # Same layout as Backup.ps1: <drive>/<computer>/<target folder>/<user>
         target="${DRIVE_MOUNT[$role]}/$(hostname)/$TARGET_FOLDER/$USER"
         role_name="${role,,}" # MASTER -> master, then ${role_name^} -> Master
-        info "${C_GREEN}${role_name^} is $target/${C_RESET}"
+        info "${role_name^} is $target/"
         TARGETS+=("$target")
     else
         info "${C_YELLOW}No valid ${role,,} drive given, or drive is locked${C_RESET}"
