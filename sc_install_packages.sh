@@ -3,7 +3,7 @@
 # --------------------------------------------------------------
 # Init
 
-packages=("man-db" "grep" "rsync" "wget" "curl" "fuse" "build-essential" "python3" "python3-pip" "python3-venv")
+packages=("man-db" "grep" "rsync" "wget" "curl" "fuse" "build-essential" "python3" "python3-pip" "python3-venv" "shellcheck")
 
 # --------------------------------------------------------------
 # Check if root
