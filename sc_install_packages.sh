@@ -8,7 +8,7 @@ packages=("man-db" "grep" "rsync" "wget" "curl" "fuse" "build-essential" "python
 # --------------------------------------------------------------
 # Check if root
 
-if [ $(id -u) -ne 0 ]; then
+if [ "$(id -u)" -ne 0 ]; then
 	echo Please run this script as root or using sudo.
 	exit
 fi
@@ -21,18 +21,18 @@ apt-get update # To get the latest package lists
 # --------------------------------------------------------------
 # Install packages
 
-for package in ${packages[@]}; do
+for package in "${packages[@]}"; do
 
-	if dpkg -s $package &>/dev/null; then
+	if dpkg -s "$package" &>/dev/null; then
 		echo ''
-		echo $package 'is already installed'
+		echo "$package is already installed"
 		echo '-----------------'
 	else
 		echo ''
-		echo $package 'is trying to get installed'
+		echo "$package is trying to get installed"
 		echo '-----------------'
 
-		apt-get install $package -y
+		apt-get install "$package" -y
 	fi
 
 	echo ""

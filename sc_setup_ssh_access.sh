@@ -20,9 +20,9 @@ ___names=("debian-01___hyperv" "debian-02___hyperv" "debian-04___hyperv" "docker
 # --------------------------------------------------------------
 # Process
 
-for i in ${!___hosts[@]}; do
+for i in "${!___hosts[@]}"; do
 
-    read -p "Are you sure you want to proceed [y/n] -> Setup ssh access for '"${___hosts[$i]}"/"${___names[$i]}"': " -r
+    read -p "Are you sure you want to proceed [y/n] -> Setup ssh access for '${___hosts[$i]}/${___names[$i]}': " -r
 
     if [[ $REPLY =~ ^[Yy]$ ]]; then
         echo ""

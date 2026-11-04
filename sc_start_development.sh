@@ -1,12 +1,13 @@
 #!/bin/bash
 
-if [ $(id -u) -ne 0 ]
+if [ "$(id -u)" -ne 0 ]
   then echo Please run this script as root or using sudo!
   exit
 fi
 
 # start apache
-if [[ $(/etc/init.d/apache2 status | grep 'active (running) since' | wc -l) > 0 ]]
+# grep -q prints nothing and only sets the exit status: 0 (true) if a line matches
+if /etc/init.d/apache2 status | grep -q 'active (running) since'
 then
 
     echo "Apache is currently running."
@@ -26,7 +27,7 @@ fi
 if [ -f /etc/init.d/mariadb ]
 then
     
-    if [[ $(/etc/init.d/mariadb status | grep 'mariadb is running' | wc -l) > 0 ]]
+    if /etc/init.d/mariadb status | grep -q 'mariadb is running'
     then
 
         echo "MariaDb is currently running."
