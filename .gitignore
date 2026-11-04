@@ -1,3 +1,6 @@
 # Local configs contain personal paths and device IDs - keep only samples in git
 config/*
 !config/*.sample.conf
+
+# Editor settings
+.vscode/
