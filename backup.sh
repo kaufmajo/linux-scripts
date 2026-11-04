@@ -24,10 +24,10 @@ VERSION="0.7.4"
 # The bright variants (9x) match PowerShell's Red, Green, ... (ConsoleColor 9-15);
 # 90 = DarkGray. The normal variants (3x) would be PowerShell's DarkRed, DarkGreen, ...
 if [[ -t 1 ]]; then
-    C_RED=$'\e[91m' C_GREEN=$'\e[92m' C_YELLOW=$'\e[93m'
-    C_MAGENTA=$'\e[95m' C_CYAN=$'\e[96m' C_GRAY=$'\e[90m' C_RESET=$'\e[0m'
+    C_RED=$'\e[91m' C_GREEN=$'\e[92m' C_YELLOW=$'\e[93m' C_BLUE=$'\e[94m'
+    C_MAGENTA=$'\e[95m' C_CYAN=$'\e[96m' C_GRAY=$'\e[90m' C_BOLD=$'\e[1m' C_RESET=$'\e[0m'
 else
-    C_RED='' C_GREEN='' C_YELLOW='' C_MAGENTA='' C_CYAN='' C_GRAY='' C_RESET=''
+    C_RED='' C_GREEN='' C_YELLOW='' C_BLUE='' C_MAGENTA='' C_CYAN='' C_GRAY='' C_BOLD='' C_RESET=''
 fi
 
 info() { printf '%s\n' "$*"; }
@@ -38,25 +38,20 @@ die() {
     exit 1
 }
 
-repeat_char() { printf "%${2}s" '' | tr ' ' "$1"; }
-
+# One line: bold title, gray subtitle.
+#   Backup Script (WSL)  Version 1.0
 main_header() {
-    local title="$1" subtitle="< $2 >" color="${3:-$C_GRAY}" width=64
-    local inner=$((width - 2))
-    center() { printf '|%*s%*s|\n' $(((inner + ${#1}) / 2)) "$1" $((inner - (inner + ${#1}) / 2)) ''; }
-    printf '\n%s' "$C_GRAY"; repeat_char '=' "$width"; printf '%s\n' "$color"
-    printf '|%*s|\n' "$inner" ''
-    center "$title"
-    center "$subtitle"
-    printf '|%*s|\n' "$inner" ''
-    printf '%s' "$C_GRAY"; repeat_char '=' "$width"; printf '%s\n\n' "$C_RESET"
+    printf '\n%s%s%s  %s%s%s\n' "$C_BOLD" "$1" "$C_RESET" "$C_GRAY" "$2" "$C_RESET"
 }
 
+# Blue marker and bold title (like Homebrew), optional detail (e.g. a path)
+# on the next line:
+#   ==> Backup
+#       /mnt/d/host/wsl-debian/user1/
 section_header() {
-    local title="$1" color="${2:-$C_GRAY}"
-    printf '\n%s' "$C_GRAY"; repeat_char '=' 64; printf '%s\n' "$C_RESET"
-    printf '%s%s%s\n' "$color" "$title" "$C_RESET"
-    printf '%s' "$C_GRAY"; repeat_char '=' 64; printf '%s\n\n' "$C_RESET"
+    local title="$1" detail="${2:-}"
+    printf '\n%s==>%s %s%s%s\n' "$C_BLUE" "$C_RESET" "$C_BOLD" "$title" "$C_RESET"
+    [[ -z "$detail" ]] || printf '    %s\n' "$detail"
 }
 
 usage() {
@@ -428,7 +423,7 @@ STAMP="$(date +%Y-%m-%d_%H_%M_%S)"
 for target in "${TARGETS[@]}"; do
 
     history_root="$target.history"
-    section_header "Backup to $target/"
+    section_header "Backup" "$target/"
 
     $DRY_RUN || mkdir -p "$target"
 
@@ -458,7 +453,7 @@ for target in "${TARGETS[@]}"; do
     # rsync saves the old versions during the mirror, so this section comes
     # after the backup. The folder only exists if an old version was saved.
     if ! $DRY_RUN; then
-        section_header "History to $history_root/$STAMP/"
+        section_header "History" "$history_root/$STAMP/"
 
         count=0
         if [[ -d "$history_root/$STAMP" ]]; then
