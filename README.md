@@ -1,4 +1,4 @@
-# linux-scripts
+# Linux scripts
 
 Bash helpers for the WSL (Debian) setup, development, and backup.
 
