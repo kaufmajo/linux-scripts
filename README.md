@@ -18,6 +18,15 @@ repository: some scripts here call Windows scripts from there.
 | [sc_setup_ssh_access.sh](#sc_setup_ssh_accesssh) | Copy the SSH public key to the configured hosts. |
 | [sc_start_development.sh](#sc_start_developmentsh) | (Re)start Apache and MariaDB. |
 
+Shared code lives in `library/` and is loaded with `source`, like the
+`library/function/` files in win_scripts:
+
+| File | Provides |
+| --- | --- |
+| `library/colors.sh` | Color variables (`C_RED`, `C_GREEN`, ...), empty when not writing to a terminal. |
+| `library/function/main_header.sh` | `main_header TITLE SUBTITLE`: one-line script header. |
+| `library/function/section_header.sh` | `section_header TITLE [DETAIL]`: `==> Title` section header. |
+
 ## backup.sh
 
 Mirrors the WSL filesystem to the master and slave backup drives with `rsync`.

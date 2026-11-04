@@ -20,38 +20,21 @@ VERSION="0.7.5"
 # OUTPUT HELPERS
 #===============================================================
 
-# Only use colors when writing to a terminal (not when piped into a log file).
-# The bright variants (9x) match PowerShell's Red, Green, ... (ConsoleColor 9-15);
-# 90 = DarkGray. The normal variants (3x) would be PowerShell's DarkRed, DarkGreen, ...
-if [[ -t 1 ]]; then
-    C_RED=$'\e[91m' C_GREEN=$'\e[92m' C_YELLOW=$'\e[93m' C_BLUE=$'\e[94m'
-    C_MAGENTA=$'\e[95m' C_CYAN=$'\e[96m' C_GRAY=$'\e[90m' C_BOLD=$'\e[1m' C_RESET=$'\e[0m'
-else
-    C_RED='' C_GREEN='' C_YELLOW='' C_BLUE='' C_MAGENTA='' C_CYAN='' C_GRAY='' C_BOLD='' C_RESET=''
-fi
+# "source" runs another file in THIS shell, so its variables and functions
+# become available here (like dot-sourcing ". file.ps1" in PowerShell).
+# shellcheck source=library/colors.sh
+source "$SCRIPT_DIR/library/colors.sh"
+# shellcheck source=library/function/main_header.sh
+source "$SCRIPT_DIR/library/function/main_header.sh"
+# shellcheck source=library/function/section_header.sh
+source "$SCRIPT_DIR/library/function/section_header.sh"
 
-info() { printf '%s\n' "$*"; }
+info(){ printf '%s\n' "$*"; }
 warn() { printf '%s%s%s\n' "$C_YELLOW" "$*" "$C_RESET" >&2; }
 error() { printf '%s%s%s\n' "$C_RED" "$*" "$C_RESET" >&2; }
 die() {
     error "ERROR: $*"
     exit 1
-}
-
-# One line: bold title, gray subtitle.
-#   Backup Script (WSL)  Version 1.0
-main_header() {
-    printf '\n%s%s%s  %s%s%s\n' "$C_BOLD" "$1" "$C_RESET" "$C_GRAY" "$2" "$C_RESET"
-}
-
-# Blue marker and bold title (like Homebrew), optional detail (e.g. a path)
-# on the next line:
-#   ==> Backup
-#       /mnt/d/host/wsl-debian/user1/
-section_header() {
-    local title="$1" detail="${2:-}"
-    printf '\n%s==>%s %s%s%s\n' "$C_BLUE" "$C_RESET" "$C_BOLD" "$title" "$C_RESET"
-    [[ -z "$detail" ]] || printf '    %s\n' "$detail"
 }
 
 usage() {
