@@ -14,7 +14,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-VERSION="0.7.5"
+VERSION="0.7.6"
 
 #===============================================================
 # OUTPUT HELPERS
@@ -257,7 +257,9 @@ prepare_drive() {
 
     local volume fstype actual_label
     volume="$(win_volume_info "$letter")"
-    [[ -n "$volume" ]] || { warn "${role_name^} drive '$letter' not found"; return 1; }
+    # Drive not found: no message here. Like Backup.ps1, the script then asks
+    # for a drive letter and reports "No valid ... drive given" if that fails.
+    [[ -n "$volume" ]] || return 1
     IFS='|' read -r fstype actual_label <<<"$volume"
 
     # Label doesn't match and drive is BitLocker -> probably locked: unlock and look again.
@@ -424,7 +426,7 @@ for target in "${TARGETS[@]}"; do
         "${EXCLUDE_ARGS[@]}" "${SOURCES[@]}" "$target/" > >(tee "$rsync_log") || true
     wait $! # let tee finish writing
 
-    [[ -s "$rsync_log" ]] || info "No changed files found for backup"
+    [[ -s "$rsync_log" ]] || info "${C_GRAY}No changed files found for backup${C_RESET}"
     rm -f -- "$rsync_log"
 
     if $SKIP_HISTORY; then
@@ -432,7 +434,8 @@ for target in "${TARGETS[@]}"; do
         continue # next target - no history to report or clean up
     fi
 
-    # Report the history like Backup.ps1: one line per file, then the count.
+    # Report the history like Backup.ps1: one line per file, or a message if
+    # nothing was moved.
     # rsync saves the old versions during the mirror, so this section comes
     # after the backup. The folder only exists if an old version was saved.
     if ! $DRY_RUN; then
@@ -441,12 +444,12 @@ for target in "${TARGETS[@]}"; do
         count=0
         if [[ -d "$history_root/$STAMP" ]]; then
             while IFS= read -r -d '' file; do
-                info "History: $file"
+                info "$file"
                 count=$((count + 1))
             done < <(find "$history_root/$STAMP" -type f -printf '%P\0' | sort -z)
         fi
 
-        info "Moved $count file(s) to history"
+        ((count > 0)) || info "${C_GRAY}No changed files found for history${C_RESET}"
     fi
 
     # Keep the newest $HISTORY_KEEP history folders. The names are timestamps,
@@ -456,6 +459,9 @@ for target in "${TARGETS[@]}"; do
             find "$history_root" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' |
                 sort -r | tail -n +$((HISTORY_KEEP + 1))
         )
+
+        # Header only when something gets deleted
+        ((${#old_folders[@]} == 0)) || section_header "History cleanup" "$history_root/"
 
         for folder in "${old_folders[@]}"; do
             if $DRY_RUN; then
